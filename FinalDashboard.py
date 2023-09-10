@@ -65,6 +65,17 @@ def state_click(state_click, parent):
         parent = add_dash_element(parent,  GraphGenerator.state_income_life(), False)
         parent = add_dash_element(parent,  GraphGenerator.birth_plots(state), True)
         
+        parent = add_dash_element(parent, GraphGenerator.get_age_death("1-4"))
+        parent = add_dash_element(parent, GraphGenerator.get_age_death("5-14"))
+        parent = add_dash_element(parent, GraphGenerator.get_age_death("15-24"))
+        parent = add_dash_element(parent, GraphGenerator.get_age_death("25-34"))
+        parent = add_dash_element(parent, GraphGenerator.get_age_death("35-44"))
+        parent = add_dash_element(parent, GraphGenerator.get_age_death("45-54"))
+        parent = add_dash_element(parent, GraphGenerator.get_age_death("55-64"))
+        parent = add_dash_element(parent, GraphGenerator.get_age_death("65-74"))
+        parent = add_dash_element(parent, GraphGenerator.get_age_death("75-84"))
+        parent = add_dash_element(parent, GraphGenerator.get_age_death("85+"))
+        
     
     return parent
 

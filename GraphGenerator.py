@@ -17,6 +17,10 @@ from math import floor
 from LifeData import LifeData
 import math
 import Partisian
+import addfips
+
+
+states =  {'Alaska': 'AK','Alabama': 'AL','Arkansas': 'AR','American Samoa': 'AS','Arizona': 'AZ','California': 'CA','Colorado': 'CO','Connecticut': 'CT','District of Columbia': 'DC','Delaware': 'DE','Florida': 'FL','Georgia': 'GA','Guam': 'GU','Hawaii': 'HI','Iowa': 'IA','Idaho': 'ID','Illinois': 'IL','Indiana': 'IN','Kansas': 'KS','Kentucky': 'KY','Louisiana': 'LA','Massachusetts': 'MA','Maryland': 'MD','Maine': 'ME','Michigan': 'MI','Minnesota': 'MN','Missouri': 'MO','Northern Mariana Islands': 'MP','Mississippi': 'MS','Montana': 'MT','National': 'NA','North Carolina': 'NC','North Dakota': 'ND','Nebraska': 'NE','New Hampshire': 'NH','New Jersey': 'NJ','New Mexico': 'NM','Nevada': 'NV','New York': 'NY','Ohio': 'OH','Oklahoma': 'OK','Oregon': 'OR','Pennsylvania': 'PA','Puerto Rico': 'PR','Rhode Island': 'RI','South Carolina': 'SC','South Dakota': 'SD','Tennessee': 'TN','Texas': 'TX','Utah': 'UT','Virginia': 'VA','Virgin Islands': 'VI','Vermont': 'VT','Washington': 'WA','Wisconsin': 'WI','West Virginia': 'WV','Wyoming': 'WY'}
 
 
 def get_best_fit(X, y):
@@ -24,6 +28,39 @@ def get_best_fit(X, y):
     x_range = np.linspace(X.min(), X.max())
     y = reg.predict(x_range.reshape(-1,1))
     return x_range, y[:,0], reg.coef_
+
+def translate_ICD10(x, conversion):
+    try:
+        return conversion[x]
+    except:
+        return x
+    
+
+def clean_state_data(df):
+    af = addfips.AddFIPS()
+    try:
+        df = df.dropna(subset=["State","ICD-10 113 Cause List Code", "Population"])
+    except: 
+        df = df.dropna(subset=["State", "Population"])
+    #df = df[df["Crude Rate"] != "Unreliable"]
+    df.Population = df.Population.astype(float)
+    df["Rate"] = (df["Deaths"]/df["Population"])*100000
+    df["Rate"] = df["Rate"].round(2)
+    df["fips"] = df.apply(lambda x: af.get_state_fips(x["State"]), axis=1)
+    df["Year"] = 2019
+    df["State_Abv"] = df.apply(lambda x: states[x["State"]], axis=1)
+    df = df.sort_values(by=["Rate"], ascending=False)
+    df.drop(columns=["Notes", "State Code", ], inplace=True)
+   
+    try:
+        f = open("data/Life/Deaths/ICD10Translation.json")
+        translation = json.load(f)
+        df["ICD-10 113 Cause List"] = df["ICD-10 113 Cause List"].apply(lambda x: translate_ICD10(x, translation))
+        df.rename(columns={"ICD-10 113 Cause List":"Cause Of Death"}, inplace=True)
+    except:
+        None
+    return df
+    
 
 def create_life_bar(indicator, state=None):
     life_data = LifeData()
@@ -289,3 +326,47 @@ def state_income_life():
     dash_element = html.Div(graph_element, className="span6", id="StateIncomeLifeDumbell_parent")
     
     return dash_element
+
+
+
+
+def get_age_death(age):
+    state_deaths = pd.read_csv(r"data/Life/Deaths/2019StateDeaths.txt", delimiter="	", na_values = ['Not Applicable'])
+    df = clean_state_data(state_deaths)
+    
+    
+    age_df = df[df["Ten-Year Age Groups Code"] == age]
+    part = Partisian.get_state_part_score()
+    age_df = pd.merge(age_df, part, left_on="State_Abv", right_on="State")
+    X = age_df['Part_Score'].values.reshape(-1,1)
+    y = age_df['Rate']
+    
+    reg = LinearRegression().fit(X, y, sample_weight=age_df['Population'])
+    x_range = np.linspace(X.min(), X.max())
+    y = reg.predict(x_range.reshape(-1,1))
+    
+    fig = make_subplots(rows=1, cols=2, vertical_spacing= 0.01, horizontal_spacing= 0.01,  subplot_titles=("",""), column_widths=[0.8, 0.2], shared_yaxes=True)
+    
+    fig.add_trace(go.Scatter(x=age_df['Part_Score'], y=age_df['Rate'],mode='markers', marker=dict(color=age_df["Part_Score"], colorscale="Bluered", size=age_df["Population"]/(age_df["Population"].max()/50)), name='Child', hovertext=age_df["State_x"]), row=1, col=1)
+    
+    hist_x = []
+    for index, row in age_df.iterrows():
+        hist_x.extend([row["Rate"] for i in range(int(round(row["Population"]/1000)))])
+        row["Rate"]
+    #fig.add_trace(go.Violin(y=hist_x, side="positive", name="Death Rate Distribution"), row=1, col=2)
+    fig.add_trace(go.Violin(y=age_df['Rate'], side="positive",  name="Death Rate Distribution"), row=1, col=2)
+    
+    
+    fig.add_trace(go.Scatter(x=x_range, y=y, mode='lines',  line=dict(color="green", dash="dash"), name='Best Fit Line'), row=1, col=1)
+    
+    fig.update_layout(title="Partisanship Score vs. Death Rate for " + age + " Year Olds", xaxis1_title="Partisanship Score", yaxis1_title="Death Rate (per 100,000)")
+    fig.update_yaxes(showticklabels=False, row=1, col=2)
+    fig.update_xaxes(showline=True, linewidth=2, linecolor='black', mirror=False)
+    fig.update_layout(height=300,width=1200, plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=0, r=0, t=25, b=0))
+    
+    
+    graph_element = dcc.Graph(figure=fig, id="DeathVsPartisanship" + age)
+    dash_element = html.Div(graph_element, className="span6", id=f"DeathVsPartisanship{age}_parent")
+    
+    return dash_element
+    
