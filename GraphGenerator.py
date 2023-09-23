@@ -369,4 +369,93 @@ def get_age_death(age):
     dash_element = html.Div(graph_element, className="span6", id=f"DeathVsPartisanship{age}_parent")
     
     return dash_element
+
+def load_state_cod(State = "Michigan"):
+    f = open("icd-10-flat-Structure.json")
+    flat_heirarchy = json.load(f)
+    df_heirarchy = pd.DataFrame(flat_heirarchy)
+    #rotate Matrix
+    df_heirarchy = df_heirarchy.transpose()
+    df_heirarchy.reset_index(inplace=True)
+    df_heirarchy.rename(columns={"index":"ICD-10 113 Cause List"}, inplace=True)
+    df_heirarchy
+
+    df = pd.read_csv(r"data/Life/Deaths/StateDeathsAge.txt", delimiter="	", na_values = ['Not Applicable'])
+    df = df.dropna(subset=["State","ICD-10 113 Cause List Code", "Population"]) 
+    state_df= df[df["State"] == "Michigan"]
+    #state_df = state_df[state_df["Ten-Year Age Groups Code"] ==age]
+    state_df["Rate"] = (state_df["Deaths"] / state_df["Population"])*100000
+    state_df["Rate"] = np.round(state_df["Rate"], 2)
+    state_df["Child_Adj_Rate"] = state_df["Rate"]
+
+
+    df_final = pd.merge(state_df, df_heirarchy, on="ICD-10 113 Cause List")
+    df_final = df_final.drop(columns=["ICD-10 113 Cause List Code", "ranges", "chapters", "base", "Notes"])
+    return df_final
+
+
+def add_children(name, child, order, flat_heirarchy):
+    order.append(name)
+    if len(child["children"]) > 0: 
+        for grand_child in child["children"]:
+            add_children(grand_child, flat_heirarchy[grand_child], order, flat_heirarchy)
+def get_depth_order(flat_heirarchy):
+    order = []
+    for key, value in flat_heirarchy.items():
+        if len(value["parents"]) == 0:
+            order.append(key)
+            for children in value["children"]:
+                add_children(children, flat_heirarchy[children],order, flat_heirarchy)
+    return order
+
+
+def get_age_cod(age, all_ages=False, state="Michgian"):
+    df = load_state_cod()
+    f = open("icd-10-flat-Structure.json")
+    flat_heirarchy = json.load(f)
+    order = get_depth_order(flat_heirarchy)
+    df = df[df["Ten-Year Age Groups Code"] ==age]
+    for e in range(5):
+        for i, row in df.iterrows():
+            children_total = 0
+            children_values =[]
+            if len(row["children"]) > 0:
+                for child in row["children"]:
+                    try:
+                        children_total += df[df["ICD-10 113 Cause List"] == child]["Child_Adj_Rate"].values[0]
+                        children_values.append(df[df["ICD-10 113 Cause List"] == child]["Child_Adj_Rate"].values[0])
+                    except:
+                        None
+            df.at[i, "Child_Adj_Rate"] = max(row["Child_Adj_Rate"], children_total)
+    df["ICD-10 113 Cause List"] = df["ICD-10 113 Cause List"].astype("category")
+    df["ICD-10 113 Cause List"] = df["ICD-10 113 Cause List"].cat.set_categories(order, ordered=True)
+    df = df.sort_values("ICD-10 113 Cause List")
     
+    labels = [age]
+    parents = [""]
+    if all_ages:
+        parents = ["All Ages"]
+    values = [0]
+    for i, row in df.iterrows():
+        labels.append(row["ICD-10 113 Cause List"] + " " + str(age)[:2])
+        if len(row["parents"]) > 0:
+            parents.append(row["parents"][0] + " " + str(age)[:2])
+        else: 
+            parents.append(age)
+            values[0] += row["Child_Adj_Rate"]
+        values.append(row["Child_Adj_Rate"])
+    return labels, parents, values, df, values[0]
+
+
+def get_all_age_cod():
+    df = load_state_cod()
+    all_labels = ["All Ages"]
+    all_parents = [""]
+    all_values = [0]
+    for age in df["Ten-Year Age Groups Code"].unique():
+        labels, parents, values, df, total = get_age_cod(age, True)
+        all_labels.extend(labels)
+        all_parents.extend(parents)
+        all_values.extend(values)
+        all_values[0] += total
+    return all_labels, all_parents, all_values

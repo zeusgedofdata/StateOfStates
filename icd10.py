@@ -110,6 +110,8 @@ def determine_child(node_a, node_b):
                 if len(node_a.ranges[chapter]) < len(node_b.ranges[chapter]):
                     return True
             return False
+
+     
     
 df = pd.read_csv(r"data/Life/Deaths/StateDeathsAge.txt", delimiter="	", na_values = ['Not Applicable'])
 df = df.dropna(subset=["State","ICD-10 113 Cause List Code", "Population"])
@@ -167,14 +169,15 @@ json_object["#Accidents (unintentional injuries) (V01-X59,Y85-Y86)"]["parents"] 
 json_object["Transport accidents (V01-V99,Y85)"]["parents"] = ["#Accidents (unintentional injuries) (V01-X59,Y85-Y86)"]
 json_object["Other land transport accidents (V01,V05-V06,V09.1,V09.3-V09.9,V10-V11,V15-V18,V19.3,V19.8-V19.9,V80.0-V80.2,V80.6-V80.9,V81.2-V81.9,V82.2-V82.9,V87.9,V88.9,V89.1,V89.3,V89.9)"]["parents"] = ["Transport accidents (V01-V99,Y85)"]
 json_object["Accidental drowning and submersion (W65-W74)"]["parents"] = ["Nontransport accidents (W00-X59,Y86)"]
+json_object["Other and unspecified nontransport accidents and their sequelae (W20-W31,W35-W64,W75-W99,X10-X39,X50-X59,Y86)"]["parents"] = ["Nontransport accidents (W00-X59,Y86)"]
 
 
-json_object["All other forms of chronic ischemic heart disease (I20,I25.1-I25.9)"]["parents"] = ["Ischemic heart diseases (I20-I25)"]
 json_object["Other forms of chronic ischemic heart disease (I20,I25)"]["parents"] = ["Ischemic heart diseases (I20-I25)"]
-json_object["All other forms of chronic ischemic heart disease (I20,I25.1-I25.9)"]["parents"] = ["Ischemic heart diseases (I20-I25)"]
+json_object["All other forms of chronic ischemic heart disease (I20,I25.1-I25.9)"]["parents"] = ["Other forms of chronic ischemic heart disease (I20,I25)"]
+json_object["Acute myocardial infarction (I21-I22)"]["parents"]= ["Ischemic heart diseases (I20-I25)"]
 
 json_object["All other forms of heart disease (I26-I28,I34-I38,I42-I49,I51)"]["parents"] = ["Other heart diseases (I26-I51)"]
-json_object["Heart failure (I50)"]["parents"] = ["#Diseases of heart (I00-I09,I11,I13,I20-I51)"]
+json_object["Heart failure (I50)"]["parents"] = ["Other heart diseases (I26-I51)"]
 json_object["Atherosclerotic cardiovascular disease, so described (I25.0)"]["parents"] = ["Ischemic heart diseases (I20-I25)"]
 json_object["Other acute ischemic heart diseases (I24)"]["parents"] = ["Ischemic heart diseases (I20-I25)"]
 json_object["Acute and subacute endocarditis (I33)"]["parents"] = ["Other heart diseases (I26-I51)"]
@@ -184,11 +187,50 @@ json_object["Diseases of pericardium and acute myocarditis (I30-I31,I40)"]["pare
 json_object["Accidental exposure to smoke, fire and flames (X00-X09)"]["parents"] = ["Nontransport accidents (W00-X59,Y86)"]
 json_object["Accidental poisoning and exposure to noxious substances (X40-X49)"]["parents"] = ["Nontransport accidents (W00-X59,Y86)"]
 
+json_object['Motor vehicle accidents (V02-V04,V09.0,V09.2,V12-V14,V19.0-V19.2,V19.4-V19.6,V20-V79,V80.3-V80.5,V81.0-V81.1,V82.0-V82.1,V83-V86,V87.0-V87.8,V88.0-V88.8,V89.0,V89.2)']["children"] =[]
+
+json_object["Atherosclerotic cardiovascular disease, so described (I25.0)"]["parents"] = ["Other forms of chronic ischemic heart disease (I20,I25)"]
 
 
+json_object["Assault (homicide) by other and unspecified means and their sequelae (*U01.0-*U01.3,*U01.5-*U01.9,*U02,X85-X92,X96-Y09,Y87.1)"]["parents"] = ["#Assault (homicide) (*U01-*U02,X85-Y09,Y87.1)"]
+json_object["Assault (homicide) by other and unspecified means and their sequelae (*U01.0-*U01.3,*U01.5-*U01.9,*U02,X85-X92,X96-Y09,Y87.1)"]["children"] = []
+json_object["#Assault (homicide) (*U01-*U02,X85-Y09,Y87.1)"]["parents"] = []
+
+json_object['#Accidents (unintentional injuries) (V01-X59,Y85-Y86)']["children"].remove('Other land transport accidents (V01,V05-V06,V09.1,V09.3-V09.9,V10-V11,V15-V18,V19.3,V19.8-V19.9,V80.0-V80.2,V80.6-V80.9,V81.2-V81.9,V82.2-V82.9,V87.9,V88.9,V89.1,V89.3,V89.9)')
+json_object['#Accidents (unintentional injuries) (V01-X59,Y85-Y86)']["children"].remove('Other and unspecified nontransport accidents and their sequelae (W20-W31,W35-W64,W75-W99,X10-X39,X50-X59,Y86)')
+json_object['#Diseases of heart (I00-I09,I11,I13,I20-I51)']["children"].remove('Atherosclerotic cardiovascular disease, so described (I25.0)')
+
+json_object["Other and unspecified events of undetermined intent and their sequelae (Y10-Y21,Y25-Y34,Y87.2,Y89.9)"]["children"] =[]
+
+
+json_object["#Intentional self-harm (suicide) (*U03,X60-X84,Y87.0)"]["parents"]=[]
+
+
+json_object["Intentional self-harm (suicide) by discharge of firearms (X72-X74)"]["parents"]=["#Intentional self-harm (suicide) (*U03,X60-X84,Y87.0)"]
+
+
+json_object["Intentional self-harm (suicide) by other and unspecified means and their sequelae (*U03,X60-X71,X75-X84,Y87.0)"]["parents"]=["#Intentional self-harm (suicide) (*U03,X60-X84,Y87.0)"]
+json_object["Other and unspecified events of undetermined intent and their sequelae (Y10-Y21,Y25-Y34,Y87.2,Y89.9)"]["children"] =[]
+
+json_object["Ischemic heart diseases (I20-I25)"]["children"].remove("All other forms of chronic ischemic heart disease (I20,I25.1-I25.9)")
+json_object["#Diseases of heart (I00-I09,I11,I13,I20-I51)"]["children"].remove("All other forms of chronic ischemic heart disease (I20,I25.1-I25.9)")
+
+#"Ischemic heart diseases (I20-I25)"
+
+
+#Accidents (unintentional injuries) (V01-X59,Y85-Y86)
 for disease in json_object.keys():
-    json_object[disease]["children"].append(disease)
-    json_object[disease]["children"] = list(set(json_object[disease]["children"]))
+    if len(json_object[disease]["parents"]) > 0:
+        json_object[json_object[disease]["parents"][0]]["children"].append(disease)
+        json_object[json_object[disease]["parents"][0]]["children"] = list(set(json_object[json_object[disease]["parents"][0]]["children"]))
+    if len(json_object[disease]["children"]) > 0:
+        disease_children = json_object[disease]["children"]
+        for child in json_object[disease]["children"]:
+            grand_children = json_object[child]["children"]
+            common_members = list(set.intersection(set(disease_children), set(grand_children)))
+            for common_member in common_members:
+                json_object[disease]["children"].remove(common_member)
+                
 
 
 #Diseases of pericardium and acute myocarditis (I30-I31,I40)
