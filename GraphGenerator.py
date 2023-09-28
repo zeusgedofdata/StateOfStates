@@ -16,8 +16,10 @@ from plotly.subplots import make_subplots
 from math import floor
 from LifeData import LifeData
 import math
-import Partisian
+import Partisian as Partisian
+import CauseOfDeathData
 import addfips
+
 
 
 states =  {'Alaska': 'AK','Alabama': 'AL','Arkansas': 'AR','American Samoa': 'AS','Arizona': 'AZ','California': 'CA','Colorado': 'CO','Connecticut': 'CT','District of Columbia': 'DC','Delaware': 'DE','Florida': 'FL','Georgia': 'GA','Guam': 'GU','Hawaii': 'HI','Iowa': 'IA','Idaho': 'ID','Illinois': 'IL','Indiana': 'IN','Kansas': 'KS','Kentucky': 'KY','Louisiana': 'LA','Massachusetts': 'MA','Maryland': 'MD','Maine': 'ME','Michigan': 'MI','Minnesota': 'MN','Missouri': 'MO','Northern Mariana Islands': 'MP','Mississippi': 'MS','Montana': 'MT','National': 'NA','North Carolina': 'NC','North Dakota': 'ND','Nebraska': 'NE','New Hampshire': 'NH','New Jersey': 'NJ','New Mexico': 'NM','Nevada': 'NV','New York': 'NY','Ohio': 'OH','Oklahoma': 'OK','Oregon': 'OR','Pennsylvania': 'PA','Puerto Rico': 'PR','Rhode Island': 'RI','South Carolina': 'SC','South Dakota': 'SD','Tennessee': 'TN','Texas': 'TX','Utah': 'UT','Virginia': 'VA','Virgin Islands': 'VI','Vermont': 'VT','Washington': 'WA','Wisconsin': 'WI','West Virginia': 'WV','Wyoming': 'WY'}
@@ -50,16 +52,24 @@ def clean_state_data(df):
     df["Year"] = 2019
     df["State_Abv"] = df.apply(lambda x: states[x["State"]], axis=1)
     df = df.sort_values(by=["Rate"], ascending=False)
-    df.drop(columns=["Notes", "State Code", ], inplace=True)
+    try:
+        df.drop(columns=["Notes", "State Code", ], inplace=True)
+    except:
+        None
    
     try:
         f = open("data/Life/Deaths/ICD10Translation.json")
         translation = json.load(f)
-        df["ICD-10 113 Cause List"] = df["ICD-10 113 Cause List"].apply(lambda x: translate_ICD10(x, translation))
-        df.rename(columns={"ICD-10 113 Cause List":"Cause Of Death"}, inplace=True)
+        df["ICD-10 Common"] = df["ICD-10 113 Cause List"].apply(lambda x: translate_ICD10(x, translation))
+        df.rename(columns={"ICD-10 Common":"Cause Of Death"}, inplace=True)
     except:
         None
     return df
+
+
+
+def graph_placeholders(id, span="span6"):
+    return html.Div(id = id+"_parent", className=span)
     
 
 def create_life_bar(indicator, state=None):
@@ -327,7 +337,10 @@ def state_income_life():
     
     return dash_element
 
-
+def get_ages():
+    state_deaths = pd.read_csv(r"data/Life/Deaths/2019StateDeaths.txt", delimiter="	", na_values = ['Not Applicable'])
+    df = clean_state_data(state_deaths)
+    return df["Ten-Year Age Groups Code"].unique()
 
 
 def get_age_death(age):
@@ -347,7 +360,7 @@ def get_age_death(age):
     
     fig = make_subplots(rows=1, cols=2, vertical_spacing= 0.01, horizontal_spacing= 0.01,  subplot_titles=("",""), column_widths=[0.8, 0.2], shared_yaxes=True)
     
-    fig.add_trace(go.Scatter(x=age_df['Part_Score'], y=age_df['Rate'],mode='markers', marker=dict(color=age_df["Part_Score"], colorscale="Bluered", size=age_df["Population"]/(age_df["Population"].max()/50)), name='Child', hovertext=age_df["State_x"]), row=1, col=1)
+    fig.add_trace(go.Scatter(x=age_df['Part_Score'], y=age_df['Rate'],mode='markers', marker=dict(color=age_df["Part_Score"], colorscale="Bluered", size=age_df["Population"]/(age_df["Population"].max()/50)), name='State', hovertext=age_df["State_x"]), row=1, col=1)
     
     hist_x = []
     for index, row in age_df.iterrows():
@@ -359,103 +372,94 @@ def get_age_death(age):
     
     fig.add_trace(go.Scatter(x=x_range, y=y, mode='lines',  line=dict(color="green", dash="dash"), name='Best Fit Line'), row=1, col=1)
     
-    fig.update_layout(title="Partisanship Score vs. Death Rate for " + age + " Year Olds", xaxis1_title="Partisanship Score", yaxis1_title="Death Rate (per 100,000)")
+    fig.update_layout(
+        #title="Partisanship Score vs. Death Rate for " + age + " Year Olds", 
+        xaxis1_title="Partisanship Score vs. Mortality Rate for " + age + " Year Olds", 
+        xaxis2_title="Mortality Rate Distribution",
+        yaxis1_title="Mortality Rate (per 100,000)")
     fig.update_yaxes(showticklabels=False, row=1, col=2)
     fig.update_xaxes(showline=True, linewidth=2, linecolor='black', mirror=False)
-    fig.update_layout(height=300,width=1200, plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=0, r=0, t=25, b=0))
+    fig.update_layout(height=300,width=1000, plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=0, r=0, t=25, b=0))
     
     
     graph_element = dcc.Graph(figure=fig, id="DeathVsPartisanship" + age)
-    dash_element = html.Div(graph_element, className="span6", id=f"DeathVsPartisanship{age}_parent")
+    dash_element = html.Div(graph_element, className="span6", id=f"DeathVsPartisanship_parent")
     
     return dash_element
 
-def load_state_cod(State = "Michigan"):
-    f = open("icd-10-flat-Structure.json")
-    flat_heirarchy = json.load(f)
-    df_heirarchy = pd.DataFrame(flat_heirarchy)
-    #rotate Matrix
-    df_heirarchy = df_heirarchy.transpose()
-    df_heirarchy.reset_index(inplace=True)
-    df_heirarchy.rename(columns={"index":"ICD-10 113 Cause List"}, inplace=True)
-    df_heirarchy
-
-    df = pd.read_csv(r"data/Life/Deaths/StateDeathsAge.txt", delimiter="	", na_values = ['Not Applicable'])
-    df = df.dropna(subset=["State","ICD-10 113 Cause List Code", "Population"]) 
-    state_df= df[df["State"] == "Michigan"]
-    #state_df = state_df[state_df["Ten-Year Age Groups Code"] ==age]
-    state_df["Rate"] = (state_df["Deaths"] / state_df["Population"])*100000
-    state_df["Rate"] = np.round(state_df["Rate"], 2)
-    state_df["Child_Adj_Rate"] = state_df["Rate"]
 
 
-    df_final = pd.merge(state_df, df_heirarchy, on="ICD-10 113 Cause List")
-    df_final = df_final.drop(columns=["ICD-10 113 Cause List Code", "ranges", "chapters", "base", "Notes"])
-    return df_final
 
 
-def add_children(name, child, order, flat_heirarchy):
-    order.append(name)
-    if len(child["children"]) > 0: 
-        for grand_child in child["children"]:
-            add_children(grand_child, flat_heirarchy[grand_child], order, flat_heirarchy)
-def get_depth_order(flat_heirarchy):
-    order = []
-    for key, value in flat_heirarchy.items():
-        if len(value["parents"]) == 0:
-            order.append(key)
-            for children in value["children"]:
-                add_children(children, flat_heirarchy[children],order, flat_heirarchy)
-    return order
 
 
-def get_age_cod(age, all_ages=False, state="Michgian"):
-    df = load_state_cod()
-    f = open("icd-10-flat-Structure.json")
-    flat_heirarchy = json.load(f)
-    order = get_depth_order(flat_heirarchy)
-    df = df[df["Ten-Year Age Groups Code"] ==age]
-    for e in range(5):
-        for i, row in df.iterrows():
-            children_total = 0
-            children_values =[]
-            if len(row["children"]) > 0:
-                for child in row["children"]:
-                    try:
-                        children_total += df[df["ICD-10 113 Cause List"] == child]["Child_Adj_Rate"].values[0]
-                        children_values.append(df[df["ICD-10 113 Cause List"] == child]["Child_Adj_Rate"].values[0])
-                    except:
-                        None
-            df.at[i, "Child_Adj_Rate"] = max(row["Child_Adj_Rate"], children_total)
-    df["ICD-10 113 Cause List"] = df["ICD-10 113 Cause List"].astype("category")
-    df["ICD-10 113 Cause List"] = df["ICD-10 113 Cause List"].cat.set_categories(order, ordered=True)
-    df = df.sort_values("ICD-10 113 Cause List")
+def get_state_cod_area(state = "Michigan"):
+    final_labels, final_parents, final_values = CauseOfDeathData.get_all_age_cod(state)    
     
-    labels = [age]
-    parents = [""]
-    if all_ages:
-        parents = ["All Ages"]
-    values = [0]
-    for i, row in df.iterrows():
-        labels.append(row["ICD-10 113 Cause List"] + " " + str(age)[:2])
-        if len(row["parents"]) > 0:
-            parents.append(row["parents"][0] + " " + str(age)[:2])
-        else: 
-            parents.append(age)
-            values[0] += row["Child_Adj_Rate"]
-        values.append(row["Child_Adj_Rate"])
-    return labels, parents, values, df, values[0]
+    fig = go.Figure(go.Treemap(
+    branchvalues = "total",
+    labels = final_labels,
+    parents =  final_parents,
+    values=final_values,
+    textinfo = "label+value+percent root",
+    textposition = 'middle center',
+    textfont = dict(family="Arial", size=16, color = '#FFFFFF')
+    ))
+
+    fig.update_layout(margin = dict(t=50, l=25, r=25, b=25))
+    fig.update_layout(
+        autosize=False,
+        width=1800,
+        height=500,
+        margin=dict(
+            l=0,
+            r=0,
+            b=0,
+            t=0,
+            pad=0
+        ),)
+    
+    graph_element = dcc.Graph(figure=fig, id="CauseOfDeathArea" )
+    dash_element = html.Div(graph_element, className="span12", id=f"CauseOfDeathArea_parent")
+    
+    return dash_element
 
 
-def get_all_age_cod():
-    df = load_state_cod()
-    all_labels = ["All Ages"]
-    all_parents = [""]
-    all_values = [0]
-    for age in df["Ten-Year Age Groups Code"].unique():
-        labels, parents, values, df, total = get_age_cod(age, True)
-        all_labels.extend(labels)
-        all_parents.extend(parents)
-        all_values.extend(values)
-        all_values[0] += total
-    return all_labels, all_parents, all_values
+
+def nation_single_cod(cod = "Major cardiovascular diseases (I00-I78)", state = "Michigan"):
+    # Load Data
+    df = pd.read_csv(r"data\Life\Deaths\2019CuaseOfDeath.txt", delimiter="	", na_values = ['Not Applicable'])
+    df = clean_state_data(df)
+    # Filter by COD
+    cod = cod.split(":")[0].strip()
+    df = df[df["ICD-10 113 Cause List"].str.contains(cod)].sort_values("Rate", ascending=False)
+    
+    fig = go.Figure()
+    fig.add_trace(go.Box(
+        x=df["Rate"], 
+        name=cod.split("(")[0],
+        boxpoints='all', # can also be outliers, or suspectedoutliers, or False
+        jitter=0.3, # add some jitter for a better separation between points
+        pointpos=-1.8, # relative position of points wrt box
+        hovertext=df["State_Abv"]
+
+    ))
+    fig.add_vline(x=df[df["State"]==state]["Rate"].values[0], line_width=3, line_dash="dash", line_color="green")
+    
+    fig.update_layout(margin = dict(t=50, l=10, r=0, b=0))
+    fig.update_layout(
+        autosize=False,
+        width=800,
+        height=200,
+        margin=dict(
+            l=0,
+            r=0,
+            b=0,
+            t=0,
+            pad=0
+        ),)
+    
+    graph_element = dcc.Graph(figure=fig, id="CauseOfDeathBoxPlot" )
+    dash_element = html.Div(graph_element, className="span6", id=f"CauseOfDeathBoxPlot_parent")
+    return dash_element
+    
