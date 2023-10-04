@@ -46,7 +46,7 @@ def clean_state_data(df):
     df.drop(columns=["Notes", "State Code", ], inplace=True)
    
     try:
-        f = open("data/Life/Deaths/ICD10Translation.json")
+        f = open(r"D:\StateOfStates\data\Life\Deaths\ICD10Translation.json")
         translation = json.load(f)
         df["ICD-10 Common"] = df["ICD-10 113 Cause List"].apply(lambda x: translate_ICD10(x, translation))
         df.rename(columns={"ICD-10 Common":"Cause Of Death"}, inplace=True)
@@ -67,12 +67,12 @@ def top_n(df, n):
 
 def get_heirarchy():
     '''Returns a dictionary of the ICD-10 heirarchy'''
-    flat_heirarchy = json.load(open("icd-10-flat-Structure.json"))
+    flat_heirarchy = json.load(open(r"D:\StateOfStates\icd-10-flat-Structure.json"))
     return flat_heirarchy
 
 def get_heirarchy_df():
     '''Returns a dataframe of the ICD-10 heirarchy'''
-    flat_heirarchy = json.load(open("icd-10-flat-Structure.json"))
+    flat_heirarchy = json.load(open(r"D:\StateOfStates\icd-10-flat-Structure.json"))
     df_heirarchy = pd.DataFrame(flat_heirarchy)
     return df_heirarchy
 
@@ -86,7 +86,7 @@ def load_state_cod(state="Michgian"):
     df_heirarchy.rename(columns={"index":"ICD-10 113 Cause List"}, inplace=True)
     df_heirarchy
 
-    df = pd.read_csv(r"data/Life/Deaths/StateDeathsAge.txt", delimiter="	", na_values = ['Not Applicable'])
+    df = pd.read_csv(r"D:/StateOfStates/data/Life/Deaths/StateDeathsAge.txt", delimiter="	", na_values = ['Not Applicable'])
     df = df.dropna(subset=["State","ICD-10 113 Cause List Code", "Population"]) 
     
     #state_df = state_df[state_df["Ten-Year Age Groups Code"] ==age]
@@ -120,7 +120,7 @@ def get_depth_order():
 
 
 
-def get_age_cod(df, age, all_ages=False):
+def get_age_cod(df, age, all_ages=False, state="Michigan"):
     '''Returns a list of labels, parents, and values for a given state and age group'''
     order = get_depth_order()
     df = df[df["Ten-Year Age Groups Code"] ==age]
@@ -143,7 +143,7 @@ def get_age_cod(df, age, all_ages=False):
     labels = [age]
     parents = [""]
     if all_ages:
-        parents = ["All Ages"]
+        parents = [state]
     values = [0]
     colors = ["white"]
     for i, row in df.iterrows():
@@ -159,11 +159,11 @@ def get_age_cod(df, age, all_ages=False):
 def get_all_age_cod(state = "Michigan"):
     '''Returns a list of labels, parents, and values for a given state and all age groups'''
     df = load_state_cod(state = state)
-    all_labels = ["All Ages"]
+    all_labels = [state]
     all_parents = [""]
     all_values = [0]
     for age in df["Ten-Year Age Groups Code"].unique():
-        labels, parents, values, df_age, total = get_age_cod(df, age, True)
+        labels, parents, values, df_age, total = get_age_cod(df, age, True, state)
         all_labels.extend(labels)
         all_parents.extend(parents)
         all_values.extend(values)

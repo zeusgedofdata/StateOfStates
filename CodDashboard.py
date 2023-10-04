@@ -61,7 +61,10 @@ def state_click(state_click, current_state, parent):
         print(state)
         if current_state != state:
             state_area = GraphGenerator.get_state_cod_area(state=state)
-            parent = add_dash_element(parent, state_area, True)       
+            parent = add_dash_element(parent, state_area, True)
+            parent = add_dash_element(parent, GraphGenerator.graph_placeholders("DeathVsPartisanship"), False)  
+            parent = add_dash_element(parent, GraphGenerator.graph_placeholders("CauseOfDeathBoxPlot"), False)
+                 
         print("Finished")
         
     return parent, state
@@ -69,15 +72,21 @@ def state_click(state_click, current_state, parent):
 
 @app.callback(Output('graph-container', 'children', allow_duplicate=True),
               Input('CauseOfDeathArea', 'clickData'),
-              State('graph-container', 'children'),
+              State('graph-container', 'children'), 
               prevent_initial_call=True)
 def area_click(cod_click, parent):
     if cod_click:
         cod_label = cod_click["points"][0]["label"]
+        try:
+            state = cod_click["points"][0]["root"]
+        except:
+            pass
         if cod_label in GraphGenerator.get_ages():
             parent = add_dash_element(parent, GraphGenerator.get_age_death(cod_label), False)
         else:
-            parent = add_dash_element(parent, GraphGenerator.nation_single_cod(cod_label), False)
+            cod, age = cod_label.split(" : ")
+            parent = add_dash_element(parent, GraphGenerator.get_age_death(age, cod), False)
+            parent = add_dash_element(parent, GraphGenerator.get_age_box(cod, state), False)
         print("Here")
         
     return parent
@@ -100,7 +109,6 @@ def add_dash_element(parent, element, new_row=True):
         if new_row:
             new_row = html.Div(className="row", children=[]).to_plotly_json()
             new_row["props"]["children"].append(element)
-            #new_row.children.append(element)
             parent.append(new_row)
         else:
             parent[-1]["props"]["children"].append(element)

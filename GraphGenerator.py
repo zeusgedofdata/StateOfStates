@@ -343,16 +343,22 @@ def get_ages():
     return df["Ten-Year Age Groups Code"].unique()
 
 
-def get_age_death(age):
-    state_deaths = pd.read_csv(r"data/Life/Deaths/2019StateDeaths.txt", delimiter="	", na_values = ['Not Applicable'])
-    df = clean_state_data(state_deaths)
-    
-    
+def get_age_death(age, cod=""):
+    if cod != "":
+        df = CauseOfDeathData.load_state_cod("All")
+        df = df[df["ICD-10 113 Cause List"].str.contains(cod)]
+        df["State_Abv"] = df.apply(lambda x: states[x["State"]], axis=1)
+    else:
+        df = pd.read_csv(r"data/Life/Deaths/2019StateDeaths.txt", delimiter="	", na_values = ['Not Applicable'])
+        df = clean_state_data(df)
+        
     age_df = df[df["Ten-Year Age Groups Code"] == age]
     part = Partisian.get_state_part_score()
     age_df = pd.merge(age_df, part, left_on="State_Abv", right_on="State")
     X = age_df['Part_Score'].values.reshape(-1,1)
     y = age_df['Rate']
+    
+    
     
     reg = LinearRegression().fit(X, y, sample_weight=age_df['Population'])
     x_range = np.linspace(X.min(), X.max())
@@ -367,19 +373,19 @@ def get_age_death(age):
         hist_x.extend([row["Rate"] for i in range(int(round(row["Population"]/1000)))])
         row["Rate"]
     #fig.add_trace(go.Violin(y=hist_x, side="positive", name="Death Rate Distribution"), row=1, col=2)
-    fig.add_trace(go.Violin(y=age_df['Rate'], side="positive",  name="Death Rate Distribution"), row=1, col=2)
+    fig.add_trace(go.Violin(y=age_df['Rate'], side="positive",  name=""), row=1, col=2)
     
     
     fig.add_trace(go.Scatter(x=x_range, y=y, mode='lines',  line=dict(color="green", dash="dash"), name='Best Fit Line'), row=1, col=1)
     
     fig.update_layout(
         #title="Partisanship Score vs. Death Rate for " + age + " Year Olds", 
-        xaxis1_title="Partisanship Score vs. Mortality Rate for " + age + " Year Olds", 
-        xaxis2_title="Mortality Rate Distribution",
+        xaxis1_title=f"Partisanship Score vs. {cod[:25]} Mortality Rate for {age} Year Olds", 
+        #xaxis2_title="Mortality Rate Distribution",
         yaxis1_title="Mortality Rate (per 100,000)")
     fig.update_yaxes(showticklabels=False, row=1, col=2)
     fig.update_xaxes(showline=True, linewidth=2, linecolor='black', mirror=False)
-    fig.update_layout(height=300,width=1000, plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=0, r=0, t=25, b=0))
+    fig.update_layout(height=300,width=900, plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=0, r=0, t=25, b=0))
     
     
     graph_element = dcc.Graph(figure=fig, id="DeathVsPartisanship" + age)
@@ -391,26 +397,28 @@ def get_age_death(age):
 
 
 
-
-
 def get_state_cod_area(state = "Michigan"):
     final_labels, final_parents, final_values = CauseOfDeathData.get_all_age_cod(state)    
     
     fig = go.Figure(go.Treemap(
-    branchvalues = "total",
-    labels = final_labels,
-    parents =  final_parents,
-    values=final_values,
-    textinfo = "label+value+percent root",
-    textposition = 'middle center',
-    textfont = dict(family="Arial", size=16, color = '#FFFFFF')
+        branchvalues = "total",
+        labels = final_labels,
+        parents =  final_parents,
+        values=final_values,
+        textinfo = "label+value+percent entry",
+        textposition = 'middle center',
+        textfont = dict(family="Arial", size=16, color = '#FFFFFF'),
+        pathbar_textfont_size=15,
+        pathbar_visible=True,
     ))
+
 
     fig.update_layout(margin = dict(t=50, l=25, r=25, b=25))
     fig.update_layout(
         autosize=False,
         width=1800,
         height=500,
+        
         margin=dict(
             l=0,
             r=0,
@@ -463,3 +471,36 @@ def nation_single_cod(cod = "Major cardiovascular diseases (I00-I78)", state = "
     dash_element = html.Div(graph_element, className="span6", id=f"CauseOfDeathBoxPlot_parent")
     return dash_element
     
+def get_age_box(cod, state="Michigan"):
+    df = CauseOfDeathData.load_state_cod("All")
+    df = df[df["ICD-10 113 Cause List"].str.contains(cod)]
+    
+    df["Start Age"] = df["Ten-Year Age Groups Code"].str.split("-").str[0].str.replace("+","")
+    df["Start Age"] = df["Start Age"].astype(int)
+
+    df = df.sort_values(by=["Start Age"])
+
+    fig = px.box(df, x="Ten-Year Age Groups Code", y="Rate", color="Ten-Year Age Groups Code", hover_data=["State", "ICD-10 113 Cause List"])
+
+    df = df[df["State"] == state]
+    df = df.sort_values(by=["Start Age"])
+    fig.add_trace(go.Scatter(
+        x = df["Ten-Year Age Groups Code"],
+        y=df["Rate"],
+        mode = "markers+lines",
+        marker=dict(color = "red"),
+        name = state
+
+    ))
+    fig.update_layout(
+        height=300,
+        width=850,
+        plot_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=0, r=0, t=25, b=0),)
+    
+    fig['layout']['xaxis']['title']=f"{cod} Mortality Rate By Age Group"
+    graph_element = dcc.Graph(figure=fig, id="CauseOfDeathBoxPlot")
+    dash_element = html.Div(graph_element, className="span6", id=f"CauseOfDeathBoxPlot_parent")
+    
+    
+    return dash_element
