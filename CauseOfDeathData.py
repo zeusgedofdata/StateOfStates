@@ -18,9 +18,8 @@ import Partisian as Partisian
 from sklearn.linear_model import LinearRegression
 import addfips
 import psycopg2
-
-import warnings
-
+import sqlalchemy
+from sqlalchemy import create_engine, text
 
 
 
@@ -38,11 +37,8 @@ def get_db_properties():
 
 def get_db_connection():
     props = get_db_properties()
-    connection = psycopg2.connect(
-        host=props["host"],
-        user=props["username"],
-        password=props["password"],
-        database="StateOfStates")
+    url = f'postgresql+psycopg2://{props["username"]}:{props["password"]}@{props["host"]}:5432/StateOfStates'
+    connection = sqlalchemy.create_engine(url)
     return connection
 
 def translate_ICD10(x, conversion):
@@ -92,36 +88,65 @@ def get_heirarchy():
     flat_heirarchy = json.load(open(r"D:\StateOfStates\icd-10-flat-Structure.json"))
     return flat_heirarchy
 
-def get_heirarchy_df():
-    '''Returns a dataframe of the ICD-10 heirarchy'''
-    flat_heirarchy = json.load(open(r"D:\StateOfStates\icd-10-flat-Structure.json"))
-    df_heirarchy = pd.DataFrame(flat_heirarchy)
-    return df_heirarchy
 
-
-def load_state_cod(state="Michgian"):
-    '''Returns a dataframe of cause of death data for a single state broken up by age group'''
-    df_heirarchy = get_heirarchy_df()
-    #rotate Matrix
-    df_heirarchy = df_heirarchy.transpose()
-    df_heirarchy.reset_index(inplace=True)
-    df_heirarchy.rename(columns={"index":"ICD-10 113 Cause List"}, inplace=True)
-    df_heirarchy
-
-    df = pd.read_csv(r"D:/StateOfStates/data/Life/Deaths/StateDeathsAge.txt", delimiter="	", na_values = ['Not Applicable'])
-    df = df.dropna(subset=["State","ICD-10 113 Cause List Code", "Population"]) 
+def load_state_cod_timeseries(state="All", age = "All", cod="All"):
+    sql = f"select l.name as state, l.acronym, l.fips, \
+            cod.rate, cod.deaths, cod.population, cod.start_age, cod.end_age, cod.year, \
+            ic.name, ic.common_name, \
+            ic2.name as parent_name, ic2.common_name as parent_common_name, \
+            p.avg as partisan_control \
+            from causes_of_death cod \
+            inner join icd_10_codes ic on cod.icd_10_codes_id_fkey = ic.id \
+            left join icd_10_codes ic2 on ic.parent = ic2.id \
+            inner join locations l on cod.locations_id_fkey = l.id \
+            inner join (select l.id, AVG(p.control_score) from locations l  \
+				inner join partisans p on l.id=p.locations_id_fkey \
+				where p.year < 2020 \
+				group by l.id ) p on cod.locations_id_fkey =p.id \
+            where l.level = 'State'"
+            
+    if state != "All":
+        sql += "and l.name = '" + state + "'"
+    if age != "All":
+        sql += " and cod.start_age = '" + str(age) + "'"
+    if cod != "All":
+        sql += " and ic.common_name = '" + cod + "'"
+    con = get_db_connection()
+    df = pd.read_sql(sql=text(sql), con = con.engine.connect())
     
-    #state_df = state_df[state_df["Ten-Year Age Groups Code"] ==age]
-    df["Rate"] = (df["Deaths"] / df["Population"])*100000
-    df["Rate"] = np.round(df["Rate"], 2)
-    df["Child_Adj_Rate"] = df["Rate"]
-    if(state != "All"):
-        df= df[df["State"] == state]
+    return df
 
 
-    df_final = pd.merge(df, df_heirarchy, on="ICD-10 113 Cause List")
-    df_final = df_final.drop(columns=["ICD-10 113 Cause List Code", "ranges", "chapters", "base", "Notes"])
-    return df_final
+
+def load_state_cod(state="All", age = "All", cod="All", year=2019):
+    '''Returns a dataframe of cause of death data for a single state broken up by age group'''
+    sql = f"select l.name as state, l.acronym, l.fips, \
+            cod.rate, cod.deaths, cod.population, cod.start_age, cod.end_age, cod.year, \
+            ic.name, ic.common_name, \
+            ic2.name as parent_name, ic2.common_name as parent_common_name, \
+            p.avg as partisan_control \
+            from causes_of_death cod \
+            inner join icd_10_codes ic on cod.icd_10_codes_id_fkey = ic.id \
+            left join icd_10_codes ic2 on ic.parent = ic2.id \
+            inner join locations l on cod.locations_id_fkey = l.id \
+            inner join (select l.id, AVG(p.control_score) from locations l  \
+				inner join partisans p on l.id=p.locations_id_fkey \
+				where p.year < 2020 \
+				group by l.id ) p on cod.locations_id_fkey =p.id \
+            where l.level = 'State'"
+    if state != "All":
+        sql += "and l.name = '" + state + "'"
+    if age != "All":
+        sql += " and cod.start_age = '" + str(age) + "'"
+    if cod != "All":
+        sql += " and ic.common_name = '" + cod + "'"
+    if year != "All":
+        sql += " and cod.year = '" + str(year) + "'"
+        
+    con = get_db_connection()
+    df = pd.read_sql(sql=text(sql), con = con.engine.connect())
+    
+    return df
 
 
 def add_children(name, child, order, flat_heirarchy):
@@ -192,13 +217,11 @@ def get_age_cod_db(age, all_ages=False, state="Michigan"):
             inner join icd_10_codes ic on cod.icd_10_codes_id_fkey = ic.id \
             left join icd_10_codes ic2 on ic.parent = ic2.id \
             inner join locations l ON cod.locations_id_fkey = l.id \
-            where l.level = 'State'"
+            where cod.year=2019 and l.level = 'State' and cod.start_age = '" + str(age) + "' and l.name = '" + state + "'" 
             
     con = get_db_connection()
     
-    df = pd.read_sql(sql, con)
-    df = df[df["start_age"] ==age]
-    df = df[df["state"] == state]
+    df = pd.read_sql(sql=text(sql), con = con.engine.connect())
     df = adjust_parent_rate(df)
     
     
@@ -221,8 +244,6 @@ def adjust_parent_rate(df):
     for i in range(5):
         for name in df["parent_name"].unique():
             age = df["start_age"].unique()[0]
-            if name == "Other heart diseases (I26-I51)" and age==55:
-                print("HERE")
             parent_df = df[df["parent_name"] == name]
             parent_rate = parent_df["rate"].sum()
             orignal_rate = 0

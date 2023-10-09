@@ -17,6 +17,7 @@ from math import floor
 import GraphGenerator
 from LifeData import LifeData
 #from GraphGenerator import cultural_ontology
+import time
 
 
 
@@ -26,7 +27,7 @@ app = JupyterDash(prevent_initial_callbacks="initial_duplicate")
 app.config.suppress_callback_exceptions = True
 
 app.layout = html.Div(className="row-fluid", children=[
-    html.H1(children='USA', style={'textAlign':'center'}),
+    #html.H1(children='USA', style={'textAlign':'center'}),
     html.Div(className="container-fluid", id="graph-container", children=[]),
     html.Button('Submit', id='make-graph', n_clicks=0),
     
@@ -39,8 +40,9 @@ app.layout = html.Div(className="row-fluid", children=[
               State('graph-container', 'children'))
 def change_main_view(start, parent):
     parent = add_dash_element(parent,  GraphGenerator.life_us_map("Life Exp"), True)
-    parent = add_dash_element(parent, GraphGenerator.graph_placeholders("CauseOfDeathBoxPlot"), False)
     parent = add_dash_element(parent, GraphGenerator.graph_placeholders("DeathVsPartisanship"), False)
+    parent = add_dash_element(parent, GraphGenerator.graph_placeholders("CauseOfDeathTimeSeries"), False)
+    parent = add_dash_element(parent, GraphGenerator.graph_placeholders("CauseOfDeathBoxPlot"), False)
     return parent
 
 
@@ -58,14 +60,15 @@ def state_click(state_click, current_state, parent):
         f = open("CodeToState.json")
         converter = json.load(f)
         state = converter[state]
-        print(state)
+        start_time = time.time()
+        print(f"State: {state} Start Time: {start_time}")
         if current_state != state:
-            state_area = GraphGenerator.get_state_cod_area(state=state)
-            parent = add_dash_element(parent, state_area, True)
+            parent = add_dash_element(parent, GraphGenerator.get_state_cod_area(state=state), True)
             parent = add_dash_element(parent, GraphGenerator.graph_placeholders("DeathVsPartisanship"), False)  
             parent = add_dash_element(parent, GraphGenerator.graph_placeholders("CauseOfDeathBoxPlot"), False)
+            parent = add_dash_element(parent, GraphGenerator.graph_placeholders("CauseOfDeathTimeSeries"), False)
                  
-        print("Finished")
+        print(f"Total time: {time.time() - start_time}")
         
     return parent, state
 
@@ -84,10 +87,11 @@ def area_click(cod_click, parent):
         if cod_label in GraphGenerator.get_ages():
             parent = add_dash_element(parent, GraphGenerator.get_age_death(cod_label), False)
         else:
-            cod, age = cod_label.split(" : ")
+            cod, age = cod_label.split(": ")
+            age = age.split("-")[0]
             parent = add_dash_element(parent, GraphGenerator.get_age_death(age, cod), False)
             parent = add_dash_element(parent, GraphGenerator.get_age_box(cod, state), False)
-        print("Here")
+            parent = add_dash_element(parent, GraphGenerator.cod_timeseries(cod=cod,state=state), False)
         
     return parent
         
