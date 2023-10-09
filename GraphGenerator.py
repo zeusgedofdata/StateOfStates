@@ -248,8 +248,6 @@ def birth_plots(state):
     #hide legend
     fig.update_layout(showlegend=False)
     #Add yaxis titles
-    
-    return fig
     graph_element = dcc.Graph(figure=fig, id="BirthScatter")
     dash_element = html.Div(graph_element, className="span6", id="BirthScatter_parent")
     return dash_element
@@ -337,7 +335,7 @@ def state_life_exp_top_vs_bottom():
     fig.add_trace(go.Scatter( x = state_income_life_exp["all_q4"], y=state_income_life_exp["statename"], mode="markers", name = "Top 25%"))
     fig.add_trace(go.Scatter( x = line_data["line_x"], y=line_data["line_y"], mode="lines", marker={"color":"grey"}, opacity=0.5,))
     fig.update_layout(width=800, plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=0, r=0, t=50, b=0))
-    return fig
+
     graph_element = dcc.Graph(figure=fig, id="StateIncomeLifeDumbell")
     dash_element = html.Div(graph_element, className="span6", id="StateIncomeLifeDumbell_parent")
     
