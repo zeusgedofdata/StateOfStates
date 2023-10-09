@@ -39,7 +39,7 @@ app.layout = html.Div(className="row-fluid", children=[
               Input('make-graph', 'id'),
               State('graph-container', 'children'))
 def change_main_view(start, parent):
-    parent = add_dash_element(parent,  GraphGenerator.life_us_map("Life Exp"), True)
+    parent = add_dash_element(parent,  GraphGenerator.indicator_us_map("Life Exp"), True)
     parent = add_dash_element(parent, GraphGenerator.graph_placeholders("DeathVsPartisanship"), False)
     parent = add_dash_element(parent, GraphGenerator.graph_placeholders("CauseOfDeathTimeSeries"), False)
     parent = add_dash_element(parent, GraphGenerator.graph_placeholders("CauseOfDeathBoxPlot"), False)
@@ -63,7 +63,7 @@ def state_click(state_click, current_state, parent):
         start_time = time.time()
         print(f"State: {state} Start Time: {start_time}")
         if current_state != state:
-            parent = add_dash_element(parent, GraphGenerator.get_state_cod_area(state=state), True)
+            parent = add_dash_element(parent, GraphGenerator.state_cod_tree_plot(state=state), True)
             parent = add_dash_element(parent, GraphGenerator.graph_placeholders("DeathVsPartisanship"), False)  
             parent = add_dash_element(parent, GraphGenerator.graph_placeholders("CauseOfDeathBoxPlot"), False)
             parent = add_dash_element(parent, GraphGenerator.graph_placeholders("CauseOfDeathTimeSeries"), False)
@@ -85,12 +85,12 @@ def area_click(cod_click, parent):
         except:
             pass
         if cod_label in GraphGenerator.get_ages():
-            parent = add_dash_element(parent, GraphGenerator.get_age_death(cod_label), False)
+            parent = add_dash_element(parent, GraphGenerator.partisan_comparison_age_cod(cod_label), False)
         else:
             cod, age = cod_label.split(": ")
             age = age.split("-")[0]
-            parent = add_dash_element(parent, GraphGenerator.get_age_death(age, cod), False)
-            parent = add_dash_element(parent, GraphGenerator.get_age_box(cod, state), False)
+            parent = add_dash_element(parent, GraphGenerator.partisan_comparison_age_cod(age, cod), False)
+            parent = add_dash_element(parent, GraphGenerator.all_ages_cod_boxplot(cod, state), False)
             parent = add_dash_element(parent, GraphGenerator.cod_timeseries(cod=cod,state=state), False)
         
     return parent

@@ -23,61 +23,38 @@ import CleanData
 
 
 
-states =  {'Alaska': 'AK','Alabama': 'AL','Arkansas': 'AR','American Samoa': 'AS','Arizona': 'AZ','California': 'CA','Colorado': 'CO','Connecticut': 'CT','District of Columbia': 'DC','Delaware': 'DE','Florida': 'FL','Georgia': 'GA','Guam': 'GU','Hawaii': 'HI','Iowa': 'IA','Idaho': 'ID','Illinois': 'IL','Indiana': 'IN','Kansas': 'KS','Kentucky': 'KY','Louisiana': 'LA','Massachusetts': 'MA','Maryland': 'MD','Maine': 'ME','Michigan': 'MI','Minnesota': 'MN','Missouri': 'MO','Northern Mariana Islands': 'MP','Mississippi': 'MS','Montana': 'MT','National': 'NA','North Carolina': 'NC','North Dakota': 'ND','Nebraska': 'NE','New Hampshire': 'NH','New Jersey': 'NJ','New Mexico': 'NM','Nevada': 'NV','New York': 'NY','Ohio': 'OH','Oklahoma': 'OK','Oregon': 'OR','Pennsylvania': 'PA','Puerto Rico': 'PR','Rhode Island': 'RI','South Carolina': 'SC','South Dakota': 'SD','Tennessee': 'TN','Texas': 'TX','Utah': 'UT','Virginia': 'VA','Virgin Islands': 'VI','Vermont': 'VT','Washington': 'WA','Wisconsin': 'WI','West Virginia': 'WV','Wyoming': 'WY'}
-
 
 def get_best_fit(X, y):
+    '''
+    Create a linear regression of X and y, and return the best fit line
+    '''
     reg = LinearRegression().fit(X, y)
     x_range = np.linspace(X.min(), X.max())
     y = reg.predict(x_range.reshape(-1,1))
     return x_range, y[:,0], reg.coef_
 
-def translate_ICD10(x, conversion):
-    try:
-        return conversion[x]
-    except:
-        return x
     
     
 def get_ages():
+    '''
+    Get the starting ages for each age group
+    '''
     return  [0, 1, 5, 15, 25, 35, 45, 55, 65, 75, 85]
     
 
-def clean_state_data(df):
-    af = addfips.AddFIPS()
-    try:
-        df = df.dropna(subset=["State","ICD-10 113 Cause List Code", "Population"])
-    except: 
-        df = df.dropna(subset=["State", "Population"])
-    #df = df[df["Crude Rate"] != "Unreliable"]
-    df.Population = df.Population.astype(float)
-    df["Rate"] = (df["Deaths"]/df["Population"])*100000
-    df["Rate"] = df["Rate"].round(2)
-    df["fips"] = df.apply(lambda x: af.get_state_fips(x["State"]), axis=1)
-    df["Year"] = 2019
-    df["State_Abv"] = df.apply(lambda x: states[x["State"]], axis=1)
-    df = df.sort_values(by=["Rate"], ascending=False)
-    try:
-        df.drop(columns=["Notes", "State Code", ], inplace=True)
-    except:
-        None
-   
-    try:
-        f = open("data/Life/Deaths/ICD10Translation.json")
-        translation = json.load(f)
-        df["ICD-10 Common"] = df["ICD-10 113 Cause List"].apply(lambda x: translate_ICD10(x, translation))
-        df.rename(columns={"ICD-10 Common":"Cause Of Death"}, inplace=True)
-    except:
-        None
-    return df
-
-
 
 def graph_placeholders(id, span="span6"):
+    '''
+    Helper function to create a placeholder for a graph
+    '''
     return html.Div(id = id+"_parent", className=span)
     
 
 def create_life_bar(indicator, state=None):
+    '''
+    Creates simple bar chart of a single health indicator, with the selected state highlighted
+    '''
+    
     life_data = LifeData()
     
     df = life_data.get_single_indicator(indicator)
@@ -99,7 +76,12 @@ def create_life_bar(indicator, state=None):
     dash_element = html.Div(dcc.Graph(figure=fig, id="LifeBarChart"), className="span4", id="LifeBarChart_parent")
     return  dash_element
   
-def life_us_map(indicator, state=None):
+def indicator_us_map(indicator, state=None):
+    '''
+    Creates US choropleth map of a single health indicator
+    '''
+    # TODO Access VIA DB
+    # TODO Add COD
     life_data = LifeData()
     df = life_data.get_single_indicator(indicator)
     fig = make_subplots(rows=1, cols=1, specs=[[{"type": "choropleth"}]])
@@ -153,6 +135,10 @@ def life_us_map(indicator, state=None):
 
 
 def state_card(state):
+    '''
+        Creates a table showing some life exp metrics 
+    '''
+    # TODO Expand contents of table, and access via DB
     life_data = LifeData()
     df = life_data.get_state_card_data(state)
     table  = dash_table.DataTable(
@@ -170,6 +156,7 @@ def state_card(state):
 
 
 def cultural_ontology():
+    # TODO Access VIA DB
     df = pd.read_csv(r"./data/Groups/final_groups.csv")
     df.fips = df.fips.apply(lambda x: str(x).zfill(2))
     with urlopen('https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json') as response:
@@ -212,58 +199,66 @@ def create_scatter(df, indicator, fig, row, col, state):
 
 
 def birth_plots(state):
-        #Get Data
-        life_data = LifeData()
-        pivot_state =life_data.get_long_format()
-        part = Partisian.get_state_part_score()
-        df = pd.merge(part, pivot_state)
-
-        #Get selected state const
-        state_infant_mortality = df[df["State"] == state]["Infant Mortality"].values[0]
-        
-        fig = make_subplots(rows=1, cols=4, vertical_spacing= 0.01, subplot_titles=("Infant Health Per 100k","","", ""))
-        
-        #hist = ff.create_distplot([df["Infant Mortality"]], ["Infant Mortality"])
-        #
-        #fig.add_trace(hist.data[0], row=1, col=1)
-        #fig.add_trace(hist.data[1], row=1, col=1)
-        fig.add_trace(go.Violin(y=pivot_state["Infant Mortality"],
-                                name="Infant Mortality", 
-                                side="negative", 
-                                meanline_visible=True,
-                                ),row=1,col=1)
-        fig.add_hline(y=state_infant_mortality, line_color="green", line_width=2, line_dash="dash", row=1, col=1, opacity=0.7)
-        fig.update_yaxes(range=[3.5,8.5], row=1, col=1)
-        create_scatter(df, "Low Birth Weight", fig, 1, 2, state)
-        create_scatter(df, "Premature", fig, 1, 3, state)
-        create_scatter(df, "Part_Score", fig, 1, 4, state)
-
-
-        fig.update_yaxes(showticklabels=False, row=1, col=3)
-        fig.update_yaxes(showticklabels=False, row=1, col=4)
-        fig.update_xaxes(showline=True, linewidth=2, linecolor='black', mirror=False)
-        fig.update_yaxes(showline=True, linewidth=2, linecolor='black', mirror=False)
-        
-        fig['layout']['yaxis1']['title']=''
-        fig['layout']['xaxis1']['title']='Infant Mortality State Dist'
-        fig['layout']['xaxis2']['title']='Low Birth Weight'
-        fig['layout']['xaxis3']['title']='Premature Births'
-        fig['layout']['xaxis4']['title']='Conservativeness'
-        fig['layout']['yaxis1']['title']='Infant Mortality'
-        
-        fig.update_layout(height=300,width=1200, plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=0, r=0, t=0, b=0))
-        
-        
-        #hide legend
-        fig.update_layout(showlegend=False)
-        #Add yaxis titles
-        
-        graph_element = dcc.Graph(figure=fig, id="BirthScatter")
-        dash_element = html.Div(graph_element, className="span6", id="BirthScatter_parent")
-        return dash_element
+    '''
+    This is 4x1 Plot that shows:
+        Infant Mortality Distribution
+        Birth Weight vs Infant Mortality
+        Premature Births vs Infant Mortality
+        Partisanship vs Infant Mortality
+    '''
+    #Get Data
+    life_data = LifeData()
+    pivot_state =life_data.get_long_format()
+    part = Partisian.get_state_part_score()
+    df = pd.merge(part, pivot_state)
+    #Get selected state const
+    state_infant_mortality = df[df["State"] == state]["Infant Mortality"].values[0]
+    
+    fig = make_subplots(rows=1, cols=4, vertical_spacing= 0.01, subplot_titles=("Infant Health Per 100k","","", ""))
+    
+    #hist = ff.create_distplot([df["Infant Mortality"]], ["Infant Mortality"])
+    #
+    #fig.add_trace(hist.data[0], row=1, col=1)
+    #fig.add_trace(hist.data[1], row=1, col=1)
+    fig.add_trace(go.Violin(y=pivot_state["Infant Mortality"],
+                            name="Infant Mortality", 
+                            side="negative", 
+                            meanline_visible=True,
+                            ),row=1,col=1)
+    fig.add_hline(y=state_infant_mortality, line_color="green", line_width=2, line_dash="dash", row=1, col=1, opacity=0.7)
+    fig.update_yaxes(range=[3.5,8.5], row=1, col=1)
+    create_scatter(df, "Low Birth Weight", fig, 1, 2, state)
+    create_scatter(df, "Premature", fig, 1, 3, state)
+    create_scatter(df, "Part_Score", fig, 1, 4, state)
+    fig.update_yaxes(showticklabels=False, row=1, col=3)
+    fig.update_yaxes(showticklabels=False, row=1, col=4)
+    fig.update_xaxes(showline=True, linewidth=2, linecolor='black', mirror=False)
+    fig.update_yaxes(showline=True, linewidth=2, linecolor='black', mirror=False)
+    
+    fig['layout']['yaxis1']['title']=''
+    fig['layout']['xaxis1']['title']='Infant Mortality State Dist'
+    fig['layout']['xaxis2']['title']='Low Birth Weight'
+    fig['layout']['xaxis3']['title']='Premature Births'
+    fig['layout']['xaxis4']['title']='Conservativeness'
+    fig['layout']['yaxis1']['title']='Infant Mortality'
+    
+    fig.update_layout(height=300,width=1200, plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=0, r=0, t=0, b=0))
+    
+    
+    #hide legend
+    fig.update_layout(showlegend=False)
+    #Add yaxis titles
+    
+    return fig
+    graph_element = dcc.Graph(figure=fig, id="BirthScatter")
+    dash_element = html.Div(graph_element, className="span6", id="BirthScatter_parent")
+    return dash_element
     
     
 def create_life_scatter(df):
+    '''
+    This is a helper function that creates a single frame in the animation of life exepectancy vs income
+    '''
     male_year =df[df["gnd"] == "M"] 
     female_year =df[df["gnd"] == "F"] 
     data = [go.Scatter(x=male_year["hh_inc"], y=male_year["le_agg"], line_color="blue", mode="markers", name="Male"),
@@ -274,7 +269,12 @@ def create_life_scatter(df):
 
 
 
-def compare_male_female():
+def life_exp_vs_income_animation():
+    '''
+    This function creates a animation showing how life expectancy and income has changed over time
+    for people at the age of 40
+    '''
+    
     year_income =  pd.read_csv(r"..\data\Life\health_ineq_online_table_2.csv")
     data = create_life_scatter(year_income[year_income["year"]==2001])
     
@@ -283,9 +283,6 @@ def compare_male_female():
             title="Year: 2001",
             xaxis=dict(range=[2, 6], autorange=False),
             yaxis=dict(range=[65, 92], autorange=False),
-            #margin=dict(l=0, r=0, b=0, t=50),
-
-
             updatemenus=[dict(
                 type="buttons",
                 buttons=[dict(label="Play",
@@ -316,8 +313,12 @@ def compare_male_female():
     
     return dash_element
 
-def state_income_life():
-    state_income_life_exp = pd.read_csv(r"data\Life\health_ineq_online_table_3.csv")
+def state_life_exp_top_vs_bottom():
+    '''
+    This plots the life expectancy of the top 25% vs bottom 25% of income earners by state
+    '''
+    
+    state_income_life_exp = pd.read_csv(r"..\data\Life\health_ineq_online_table_3.csv")
     state_income_life_exp = state_income_life_exp[state_income_life_exp["statename"]!="District of Columbia"]
     state_income_life_exp["all_q1"] = (state_income_life_exp["le_agg_q1_M"] + state_income_life_exp["le_agg_q1_F"])/2
     state_income_life_exp["all_q4"] = (state_income_life_exp["le_agg_q4_M"] + state_income_life_exp["le_agg_q4_F"])/2
@@ -336,15 +337,19 @@ def state_income_life():
     fig.add_trace(go.Scatter( x = state_income_life_exp["all_q4"], y=state_income_life_exp["statename"], mode="markers", name = "Top 25%"))
     fig.add_trace(go.Scatter( x = line_data["line_x"], y=line_data["line_y"], mode="lines", marker={"color":"grey"}, opacity=0.5,))
     fig.update_layout(width=800, plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=0, r=0, t=50, b=0))
-    
+    return fig
     graph_element = dcc.Graph(figure=fig, id="StateIncomeLifeDumbell")
     dash_element = html.Div(graph_element, className="span6", id="StateIncomeLifeDumbell_parent")
     
     return dash_element
 
 
-
-def get_state_cod_area(state = "Michigan"):
+def state_cod_tree_plot(state = "Michigan"):
+    '''
+    This creates a tree plot of the cause of death where the heirarchy is:
+        Single State->Age->COD->COD
+    '''
+    
     final_labels, final_parents, final_values = CauseOfDeathData.get_all_age_cod(state)    
     
     fig = go.Figure(go.Treemap(
@@ -378,47 +383,12 @@ def get_state_cod_area(state = "Michigan"):
     return dash_element
 
 
-
-def nation_single_cod(cod = "Major cardiovascular diseases (I00-I78)", state = "Michigan"):
-    # Load Data
-    df = pd.read_csv(r"..\data\Life\Deaths\2019CuaseOfDeath.txt", delimiter="	", na_values = ['Not Applicable'])
-    df = clean_state_data(df)
-    # Filter by COD
-    df = df[df["ICD-10 113 Cause List"] == cod].sort_values("Rate", ascending=False)
+def partisan_comparison_age_cod(age, cod="All"):
     
-    fig = go.Figure()
-    fig.add_trace(go.Box(
-        x=df["Rate"], 
-        name=cod.split("(")[0],
-        boxpoints='all', # can also be outliers, or suspectedoutliers, or False
-        jitter=0.3, # add some jitter for a better separation between points
-        pointpos=-1.8, # relative position of points wrt box
-        hovertext=df["State_Abv"]
-
-    ))
-    fig.add_vline(x=df[df["State"]==state]["Rate"].values[0], line_width=3, line_dash="dash", line_color="green")
-    
-    fig.update_layout(margin = dict(t=50, l=10, r=0, b=0))
-    fig.update_layout(
-        autosize=False,
-        width=800,
-        height=200,
-        margin=dict(
-            l=0,
-            r=0,
-            b=0,
-            t=0,
-            pad=0
-        ),)
-    
-
-    graph_element = dcc.Graph(figure=fig, id="CauseOfDeathBoxPlot" )
-    dash_element = html.Div(graph_element, className="span6", id=f"CauseOfDeathBoxPlot_parent")
-    return dash_element
-
-
-
-def get_age_death(age, cod="All"):
+    '''
+    Creates a scatter plot of the mortality rate vs partisanship score for a given age group and/or cause of death
+    Also fits a regression line to that plot to show correlation
+    '''
 
     df = CauseOfDeathData.load_state_cod(state="All", age=age, cod=cod)
     if cod == "All":
@@ -477,9 +447,52 @@ def get_age_death(age, cod="All"):
     
     return dash_element
 
-
+def single_age_cod_boxplot(cod = "Major cardiovascular diseases (I00-I78)", state = "Michigan"):
+    '''
+    Creates a boxplot for a single cause of death, highlighting where the selected state falls on the distribution
+    '''
     
-def get_age_box(cod, state="Michigan"):
+    # Load Data
+    df = pd.read_csv(r"..\data\Life\Deaths\2019CuaseOfDeath.txt", delimiter="	", na_values = ['Not Applicable'])
+    df = CleanData.clean_state_data(df)
+    # Filter by COD
+    df = df[df["ICD-10 113 Cause List"] == cod].sort_values("Rate", ascending=False)
+    
+    fig = go.Figure()
+    fig.add_trace(go.Box(
+        x=df["Rate"], 
+        name=cod.split("(")[0],
+        boxpoints='all', # can also be outliers, or suspectedoutliers, or False
+        jitter=0.3, # add some jitter for a better separation between points
+        pointpos=-1.8, # relative position of points wrt box
+        hovertext=df["State_Abv"]
+
+    ))
+    fig.add_vline(x=df[df["State"]==state]["Rate"].values[0], line_width=3, line_dash="dash", line_color="green")
+    
+    fig.update_layout(margin = dict(t=50, l=10, r=0, b=0))
+    fig.update_layout(
+        autosize=False,
+        width=800,
+        height=200,
+        margin=dict(
+            l=0,
+            r=0,
+            b=0,
+            t=0,
+            pad=0
+        ),)
+
+    graph_element = dcc.Graph(figure=fig, id="CauseOfDeathBoxPlot" )
+    dash_element = html.Div(graph_element, className="span6", id=f"CauseOfDeathBoxPlot_parent")
+    return dash_element
+    
+def all_ages_cod_boxplot(cod, state="Michigan"):
+    '''
+    Creates a boxplot for each age group for a given cause of death, 
+    highlighting where the selected state falls on the distribution
+    '''
+    
     df = CauseOfDeathData.load_state_cod(state= "All", cod = cod)
     df["age"] = df["start_age"].astype(str) + "-" + df["end_age"].astype(str)
     df = df.sort_values(by=["start_age"])
@@ -513,6 +526,11 @@ def get_age_box(cod, state="Michigan"):
 
 
 def cod_timeseries(cod = "Suicide", state = "Michigan"):
+    '''
+    Creates Time series for a single COD and state and compares to the national avg
+    '''
+    
+    
     df = CauseOfDeathData.load_state_cod(state="All", year="All", cod = cod)
     df = df.sort_values(by=["year", "start_age"])
     state_df = df[df["state"] == state]
